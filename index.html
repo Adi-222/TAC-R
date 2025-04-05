@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TAC Generator</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(45deg, #3c096c, #64dfdf, #9381ff, #023e8a);
+            text-align: center;
+            padding: 20px;
+            animation: gradientBG 6s infinite linear;
+            background-size: 300% 300%;
+        }
+        
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .container {
+            background: #000000;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0px 4px 20px rgba(57, 66, 66, 0.3);
+            max-width: 600px;
+            margin: auto;
+            position: relative;
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+            color: #f2f4f3;
+        }
+        
+        .container::before {
+            content: "";
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, #3c096c, #64dfdf, #9381ff, #023e8a);
+            animation: movingGlow 5s infinite linear;
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        @keyframes movingGlow {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        textarea, button {
+            width: 100%;
+            padding: 12px;
+            margin-top: 12px;
+            border-radius: 6px;
+            border: none;
+            transition: all 0.3s ease;
+            font-size: 16px;
+        }
+        
+        button {
+            background: linear-gradient(45deg, #3c096c, #64dfdf);
+            color: white;
+            cursor: pointer;
+            box-shadow: 0px 4px 15px rgba(100, 223, 223, 0.4);
+            transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+        }
+        
+        button:hover {
+            background: linear-gradient(45deg, #64dfdf, #9381ff);
+            box-shadow: 0px 6px 20px rgba(147, 129, 255, 0.6);
+            transform: scale(1.05);
+        }
+        
+        pre {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 12px;
+            border-radius: 6px;
+            text-align: left;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            transition: transform 0.3s ease-in-out;
+            color: #f2f4f3;
+        }
+        
+        pre:hover {
+            transform: scale(1.02);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>TAC Generator</h2>
+        <textarea id="codeInput" rows="8" placeholder="Enter code (If-Else & Loops)"></textarea>
+        <button onclick="generateTAC()">Generate TAC</button>
+        <h3>Generated Three-Address Code:</h3>
+        <pre id="tacOutput"></pre>
+    </div>
+
+    <script>
+        function generateTAC() {
+            const code = document.getElementById("codeInput").value;
+            if (!code.trim()) return;
+            
+            let instructions = [];
+            let tempVarCount = 0;
+            let instructionCount = 1;
+            let stack = [];
+            
+            function newTemp() {
+                return `t${tempVarCount++}`;
+            }
+            
+            function printInstruction(instr) {
+                instructions.push(`${instructionCount++}) ${instr}`);
+            }
+            
+            let lines = code.split("\n").map(line => line.trim());
+            
+            lines.forEach(line => {
+                if (line.startsWith("if")) {
+                    let condition = line.match(/if\s*\((.*?)\)/)[1];
+                    let labelElse = instructionCount + 2;
+                    printInstruction(`if ${condition} goto ${labelElse}`);
+                    printInstruction(`goto END`);
+                    stack.push(labelElse);
+                } else if (line.startsWith("while")) {
+                    let condition = line.match(/while\s*\((.*?)\)/)[1];
+                    let loopStart = instructionCount;
+                    let exitLabel = loopStart + 2;
+                    printInstruction(`if ${condition} goto ${loopStart + 1}`);
+                    printInstruction(`goto ${exitLabel}`);
+                    stack.push([loopStart, exitLabel]);
+                } else if (line === "} else {") {
+                    let elseLabel = stack.pop();
+                    let endLabel = instructionCount + 1;
+                    printInstruction(`goto ${endLabel}`);
+                    stack.push(endLabel);
+                } else if (line === "}") {
+                    if (stack.length) {
+                        let top = stack.pop();
+                        if (Array.isArray(top)) {
+                            printInstruction(`goto ${top[0]}`);
+                        }
+                    }
+                } else if (line.includes("=")) {
+                    let [varName, expr] = line.split("=").map(x => x.trim());
+                    let tokens = expr.split(/(\+|\-|\*|\/)/);
+                    if (tokens.length === 3) {
+                        let [operand1, operator, operand2] = tokens.map(x => x.trim());
+                        let tempVar = newTemp();
+                        printInstruction(`${tempVar} = ${operand1} ${operator} ${operand2}`);
+                        printInstruction(`${varName} = ${tempVar}`);
+                    } else {
+                        printInstruction(`${varName} = ${expr}`);
+                    }
+                }
+            });
+            printInstruction("END");
+            document.getElementById("tacOutput").textContent = instructions.join("\n");
+        }
+    </script>
+</body>
+</html>
